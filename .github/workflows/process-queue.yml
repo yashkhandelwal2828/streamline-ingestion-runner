@@ -35,8 +35,11 @@ jobs:
           node-version: '22'
           cache: npm
 
-      - run: npm ci
-      - run: npm run build
+      - name: Install dependencies
+        run: npm ci --include=dev
+
+      - name: Build
+        run: npm run build
 
       - name: Run worker burst
         env:
