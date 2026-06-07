@@ -14,7 +14,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      NODE_ENV: production
       RUN_CRON_SCHEDULER: 'false'
       TMDB_REQUESTS_PER_SECOND: '8'
       TMDB_MAX_429_BACKOFF_SECONDS: '300'
@@ -41,6 +40,7 @@ jobs:
 
       - name: Run worker burst
         env:
+          NODE_ENV: production
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}

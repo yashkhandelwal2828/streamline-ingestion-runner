@@ -25,7 +25,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      NODE_ENV: production
       INGESTION_QUEUE_HIGH_WATERMARK: '10000'
       INGESTION_SNAPSHOT_RETENTION_DAYS: '1'
       INGESTION_JOB_HISTORY_RETENTION_DAYS: '7'
@@ -60,12 +59,14 @@ jobs:
       - name: Run snapshot and job history cleanup
         if: steps.task.outputs.task == 'cleanup'
         env:
+          NODE_ENV: production
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npm run ingestion:cleanup
 
       - name: Enqueue OMDb enrichment jobs
         if: steps.task.outputs.task == 'enqueue-omdb'
         env:
+          NODE_ENV: production
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
         run: npm run ingestion:enqueue-omdb
