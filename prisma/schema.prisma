@@ -1,0 +1,188 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Movie {
+  id                   Int       @id @default(autoincrement())
+  tmdbId               Int
+  imdbId               String?
+  mediaType            String    @default("movie") // "movie" or "tv"
+  title                String    // For TV: maps from TMDB "name"
+  overview             String
+  posterPath           String?
+  releaseDate          DateTime? // For TV: maps from TMDB "first_air_date"
+  genres               String[]
+  director             String[]  @default([]) // For storing director names (TV: created_by)
+  cast                 String[]  @default([]) // For storing cast names
+  watchProviders       String[]  @default([]) // For storing provider names
+  originalLanguage     String?   // For storing language code e.g., "en", "hi"
+  imdbRating           Float?
+  rottenTomatoesRating Int?      // Storing as an integer (e.g., 95 for 95%)
+  metascore            Int?
+  imdbVotes            String?
+  imdbVotesNumeric     Int?      // Parsed integer for efficient filtering
+  runtimeMinutes       Int?      // Movie runtime from TMDB for picker time choices
+  totalSeasons         Int?      // TV only: number of seasons
+  totalEpisodes        Int?      // TV only: total episode count
+  watchLink            String?   // Link to watch the movie on streaming platforms
+  trailerUrl           String?   // Reliable YouTube trailer URL when known
+  trailerSource        String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  platformAvailability PlatformAvailability[]
+  userActions          UserMovieAction[]
+
+  @@index([updatedAt]) // Index for efficiently finding oldest movies
+  @@index([mediaType]) // Index for filtering by media type
+  @@index([imdbVotesNumeric]) // Index for vote filtering
+  @@index([runtimeMinutes]) // Index for picker runtime filtering
+  @@unique([tmdbId, mediaType])
+}
+
+enum IngestionJobType {
+  CATALOG_REFRESH
+  DISCOVER
+  FETCH
+  NORMALIZE
+  DEEP_ENRICH
+}
+
+enum IngestionJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  DEAD_LETTERED
+}
+
+enum IngestionSnapshotSource {
+  TMDB
+  OMDB
+  INTERNAL
+}
+
+model IngestionJob {
+  id               String             @id @default(cuid())
+  type             IngestionJobType
+  status           IngestionJobStatus @default(QUEUED)
+  source           String
+  region           String             @default("IN")
+  requestedBy      String?
+  shadowMode       Boolean            @default(false)
+  dedupeKey        String
+  priority         Int                @default(100)
+  payload          Json
+  attempts         Int                @default(0)
+  maxAttempts      Int                @default(5)
+  availableAt      DateTime           @default(now())
+  lockedAt         DateTime?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  failedAt         DateTime?
+  lastHeartbeatAt  DateTime?
+  errorMessage     String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  rawSnapshots     IngestionSnapshot[]
+
+  @@index([status, availableAt])
+  @@index([dedupeKey, status])
+}
+
+model IngestionSnapshot {
+  id         String                  @id @default(cuid())
+  source     IngestionSnapshotSource
+  externalId String
+  region     String                  @default("IN")
+  payload    Json
+  jobId      String?
+  expiresAt  DateTime
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+  job        IngestionJob?           @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([source, externalId, region])
+  @@index([expiresAt])
+}
+
+model PlatformAvailability {
+  id           Int      @id @default(autoincrement())
+  movieId       Int
+  region        String
+  providerName  String
+  watchLink     String?
+  lastSeenAt    DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  movie         Movie    @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@unique([movieId, region, providerName])
+  @@index([region])
+}
+
+enum UserMovieActionType {
+  WATCH_LATER
+  WISHLIST
+  PASSED
+  WATCHED
+}
+
+model UserMovieAction {
+  id                  Int                 @id @default(autoincrement())
+  userId              String
+  movieId             Int
+  action              UserMovieActionType
+  source              String              @default("api")
+  lastClientRequestId String?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  movie               Movie               @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
+  @@index([userId])
+  @@index([movieId])
+  @@index([action])
+}
+
+model User {
+  id            String          @id @default(uuid())
+  email         String          @unique
+  name          String?
+  passwordHash  String?
+  googleId      String?         @unique
+  avatarUrl     String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  actions       UserMovieAction[]
+  preference    UserPreference?
+}
+
+model UserPreference {
+  id                  Int      @id @default(autoincrement())
+  userId              String   @unique
+  languages           String[] @default([])
+  genres              String[] @default([])
+  platforms           String[] @default([])
+  contentType         String   @default("all")
+  releaseYearMin      Int?
+  releaseYearMax      Int?
+  minRating           Float?
+  favoriteActors      String[] @default([])
+  favoriteDirectors   String[] @default([])
+  runtimePreference   String   @default("any")
+  discoveryMode       String   @default("balanced")
+  onboardingCompleted Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

@@ -1,0 +1,40 @@
+name: Enqueue daily catalog fill
+
+on:
+  schedule:
+    - cron: '10 */6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: enqueue-daily-catalog-fill
+  cancel-in-progress: false
+
+jobs:
+  enqueue-daily:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_ENV: production
+      INGESTION_QUEUE_HIGH_WATERMARK: '10000'
+      INGESTION_QUEUE_REFILL_TARGET: '5000'
+      INGESTION_DAILY_TARGET: '20000'
+      INGESTION_MIN_RELEASE_YEAR: '2010'
+      INGESTION_LANGUAGE_MODE: weighted
+      INGESTION_LANGUAGE_WEIGHTS: 'hi:100,en:20,ta:15,te:15,ml:10'
+      INGESTION_FALLBACK_TO_GLOBAL: 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Enqueue daily catalog fill
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: npm run ingestion:enqueue-daily

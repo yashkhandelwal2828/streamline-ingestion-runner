@@ -1,0 +1,47 @@
+name: Process ingestion queue
+
+on:
+  schedule:
+    - cron: '*/45 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: process-ingestion-queue
+  cancel-in-progress: false
+
+jobs:
+  process-queue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NODE_ENV: production
+      RUN_CRON_SCHEDULER: 'false'
+      TMDB_REQUESTS_PER_SECOND: '8'
+      TMDB_MAX_429_BACKOFF_SECONDS: '300'
+      INGESTION_POLL_INTERVAL_MS: '5000'
+      INGESTION_MAX_JOBS_PER_TICK: '3'
+      INGESTION_STALE_RECOVERY_MINUTES: '15'
+      INGESTION_STALE_RECOVERY_INTERVAL_MS: '60000'
+      INGESTION_MIN_RELEASE_YEAR: '2010'
+      INGESTION_LANGUAGE_MODE: weighted
+      INGESTION_LANGUAGE_WEIGHTS: 'hi:100,en:20,ta:15,te:15,ml:10'
+      INGESTION_FALLBACK_TO_GLOBAL: 'true'
+      INGESTION_OMDB_DAILY_LIMIT: '950'
+      INGESTION_OMDB_RETRY_RESERVE: '50'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Run worker burst
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
+        run: timeout 300 npm run start:worker

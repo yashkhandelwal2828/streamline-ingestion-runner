@@ -1,0 +1,28 @@
+{
+  "name": "streamline-ingestion-runner",
+  "version": "1.0.0",
+  "description": "GitHub Actions ingestion runner for Streamline — queue processing, catalog growth, and OMDb enrichment against the shared PostgreSQL database.",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "prisma generate && tsc",
+    "start:worker": "node dist/worker.js",
+    "ingestion:enqueue-daily": "node dist/scripts/ingestionEnqueueDaily.js",
+    "ingestion:enqueue-delta": "node dist/scripts/ingestionEnqueueDelta.js",
+    "ingestion:cleanup": "node dist/scripts/ingestionCleanup.js",
+    "ingestion:enqueue-omdb": "node dist/scripts/ingestionEnqueueOmdb.js",
+    "test": "node --test tests/**/*.test.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.19.0",
+    "axios": "^1.13.2",
+    "dotenv": "^17.2.3",
+    "node-cron": "^4.2.1",
+    "prisma": "^6.19.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "@types/node-cron": "^3.0.11",
+    "typescript": "^5.9.3"
+  }
+}

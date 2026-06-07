@@ -1,0 +1,37 @@
+name: Enqueue delta refresh
+
+on:
+  schedule:
+    - cron: '20 */6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: enqueue-delta-refresh
+  cancel-in-progress: false
+
+jobs:
+  enqueue-delta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NODE_ENV: production
+      INGESTION_QUEUE_HIGH_WATERMARK: '10000'
+      INGESTION_DELTA_PAGES_TO_SCAN: '2'
+      INGESTION_DELTA_TARGET_COUNT: '30'
+      INGESTION_DELTA_WINDOW_HOURS: '48'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Enqueue delta refresh
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: npm run ingestion:enqueue-delta

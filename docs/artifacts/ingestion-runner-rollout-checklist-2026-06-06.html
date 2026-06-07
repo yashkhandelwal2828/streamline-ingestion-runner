@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Streamline Ingestion Runner — Your Action Items</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --card: #1a2332;
+      --border: #2d3a4d;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #5eb3ff;
+      --ok: #3dd68c;
+      --warn: #f5c542;
+      --danger: #ff6b6b;
+      --phase: #a78bfa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      margin: 0;
+      padding: 24px 16px 64px;
+      max-width: 920px;
+      margin-inline: auto;
+    }
+    h1 { font-size: 1.65rem; margin: 0 0 8px; }
+    .subtitle { color: var(--muted); margin-bottom: 28px; font-size: 0.95rem; }
+    nav {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      margin-bottom: 28px; padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+    nav a {
+      color: var(--accent); text-decoration: none; font-size: 0.85rem;
+      padding: 6px 12px; border-radius: 6px; background: var(--card);
+      border: 1px solid var(--border);
+    }
+    nav a:hover { border-color: var(--accent); }
+    section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 22px;
+      margin-bottom: 20px;
+    }
+    h2 {
+      font-size: 1.1rem;
+      margin: 0 0 4px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .phase-tag {
+      font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--phase); font-weight: 600;
+    }
+    .phase-desc { color: var(--muted); font-size: 0.88rem; margin: 0 0 16px; }
+    ol { margin: 0; padding-left: 1.25rem; }
+    li { margin-bottom: 14px; }
+    li:last-child { margin-bottom: 0; }
+    .item-title { font-weight: 600; margin-bottom: 4px; }
+    .item-detail { color: var(--muted); font-size: 0.9rem; }
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.82rem;
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+    code { padding: 2px 6px; }
+    pre {
+      padding: 12px 14px;
+      overflow-x: auto;
+      margin: 8px 0 0;
+      color: #c9d1d9;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-top: 10px; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-weight: 500; }
+    .callout {
+      border-radius: 8px; padding: 12px 14px; margin-top: 14px; font-size: 0.88rem;
+    }
+    .callout.warn { background: rgba(245,197,66,0.12); border: 1px solid rgba(245,197,66,0.35); }
+    .callout.ok { background: rgba(61,214,140,0.1); border: 1px solid rgba(61,214,140,0.3); }
+    .callout.danger { background: rgba(255,107,107,0.1); border: 1px solid rgba(255,107,107,0.35); }
+    .status-done { color: var(--ok); }
+    .status-todo { color: var(--warn); }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+    @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+    .metric { background: #0d1117; border-radius: 8px; padding: 12px; border: 1px solid var(--border); }
+    .metric strong { display: block; font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  </style>
+</head>
+<body>
+  <h1>Streamline Ingestion Runner — Action Items</h1>
+  <p class="subtitle">Repo: <code>/Users/yashkhandelwal/Documents/streamline/streamline-ingestion-runner</code> · Generated 2026-06-06 · Code is built and tested locally; nothing is pushed or live yet.</p>
+
+  <nav>
+    <a href="#done">Already done</a>
+    <a href="#phase0">Phase 0 — API prep</a>
+    <a href="#phase1">Phase 1 — GitHub repo</a>
+    <a href="#phase2">Phase 2 — Dry run</a>
+    <a href="#phase3">Phase 3 — Go live</a>
+    <a href="#phase4">Phase 4 — Tune</a>
+    <a href="#watch">What to watch</a>
+    <a href="#decisions">Open decisions</a>
+  </nav>
+
+  <section id="done">
+    <h2><span class="status-done">✓</span> Already done (by implementation)</h2>
+    <ul style="margin:12px 0 0; padding-left:1.25rem; color:var(--muted); font-size:0.9rem;">
+      <li>Runner repo scaffolded with worker, 4 scripts, ingestion services, Prisma schema</li>
+      <li>4 GitHub workflow YAML files (process-queue, enqueue-daily, enqueue-delta, maintenance)</li>
+      <li><code>npm run build</code> passes; 16 unit tests pass</li>
+      <li>Git initialized locally (no commit, no remote yet)</li>
+      <li>Backend worktree: missing <code>queueConfig.ts</code> + enqueue scripts added so API repo builds</li>
+    </ul>
+  </section>
+
+  <section id="phase0">
+    <h2><span class="phase-tag">Phase 0</span> Prepare Render API (API-only mode)</h2>
+    <p class="phase-desc">Do this before or in parallel with GitHub setup. The API must not run ingestion once GH Actions owns the queue.</p>
+    <ol>
+      <li>
+        <div class="item-title">Confirm Render start command is API-only</div>
+        <div class="item-detail">Dashboard → streamline-api → Settings → Start Command must be <code>npm start</code>, not <code>npm run start:integrated</code> or <code>start:all</code>.</div>
+      </li>
+      <li>
+        <div class="item-title">Set <code>RUN_BACKGROUND_WORKER_IN_API=false</code></div>
+        <div class="item-detail">Already in <code>render.yaml</code>. Verify it is set in the live Render Dashboard env vars (not overridden).</div>
+      </li>
+      <li>
+        <div class="item-title">Shrink API database connection pool</div>
+        <div class="item-detail">Append to Render <code>DATABASE_URL</code>:</div>
+        <pre>postgresql://USER:PASS@HOST/DB?sslmode=require&connection_limit=4</pre>
+        <div class="item-detail">Neon free tier: keep API at 4 connections so GH runner + API don't exhaust the pool.</div>
+      </li>
+      <li>
+        <div class="item-title">Merge backend worktree changes to main (when ready)</div>
+        <div class="item-detail">Branch <code>codex-ingestion-pipeline</code> has: <code>queueConfig.ts</code>, enqueue scripts, <code>render.yaml</code>, worker cron guard. Deploy after review.</div>
+      </li>
+      <li>
+        <div class="item-title">Do not use drain from GitHub</div>
+        <div class="item-detail">Admin <code>POST /api/ingest/drain</code> may stay for manual ops only. CI must never call it.</div>
+      </li>
+    </ol>
+  </section>
+
+  <section id="phase1">
+    <h2><span class="phase-tag">Phase 1</span> Publish runner repo on GitHub</h2>
+    <p class="phase-desc">Make the local repo remote and public-safe.</p>
+    <ol>
+      <li>
+        <div class="item-title">Create GitHub repository</div>
+        <div class="item-detail">Name suggestion: <code>streamline-ingestion-runner</code>. Public repo = unlimited GitHub Actions minutes for this worker.</div>
+      </li>
+      <li>
+        <div class="item-title">Initial commit and push</div>
+        <pre>cd ~/Documents/streamline/streamline-ingestion-runner
+git commit -m "feat: GitHub Actions ingestion runner MVP"
+git remote add origin git@github.com:YOUR_ORG/streamline-ingestion-runner.git
+git push -u origin main</pre>
+      </li>
+      <li>
+        <div class="item-title">Add GitHub Actions secrets</div>
+        <div class="item-detail">Settings → Secrets and variables → Actions → New repository secret:</div>
+        <table>
+          <thead><tr><th>Secret</th><th>Value notes</th></tr></thead>
+          <tbody>
+            <tr><td><code>DATABASE_URL</code></td><td>Same Neon DB as production. Use <code>connection_limit=2</code> for runner (separate from API's 4).</td></tr>
+            <tr><td><code>TMDB_API_KEY</code></td><td>Same key as Render API.</td></tr>
+            <tr><td><code>OMDB_API_KEY</code></td><td>Same key as Render API.</td></tr>
+          </tbody>
+        </table>
+        <div class="callout danger">Never commit <code>.env</code>. Workflow logs must not print connection strings or API keys.</div>
+      </li>
+      <li>
+        <div class="item-title">Enable GitHub Actions</div>
+        <div class="item-detail">Settings → Actions → General → allow workflows. Scheduled workflows only run on the default branch after push.</div>
+      </li>
+    </ol>
+  </section>
+
+  <section id="phase2">
+    <h2><span class="phase-tag">Phase 2</span> Dry run and shadow validation</h2>
+    <p class="phase-desc">Prove GH → Postgres → TMDB path before full cron enablement.</p>
+    <ol>
+      <li>
+        <div class="item-title">Optional: local smoke test with real DB</div>
+        <pre>cp .env.example .env   # fill DATABASE_URL, TMDB_API_KEY, OMDB_API_KEY
+npm run build
+npm run ingestion:enqueue-delta    # should log JSON, exit 0
+RUN_CRON_SCHEDULER=false timeout 60 npm run start:worker</pre>
+      </li>
+      <li>
+        <div class="item-title">Manual dispatch: Process ingestion queue</div>
+        <div class="item-detail">Actions → <strong>Process ingestion queue</strong> → Run workflow. Check logs for worker start, job claims, no secret leaks.</div>
+      </li>
+      <li>
+        <div class="item-title">Verify jobs in database</div>
+        <div class="item-detail">In Neon SQL editor or psql:</div>
+        <pre>SELECT status, type, COUNT(*) FROM "IngestionJob" GROUP BY status, type;
+SELECT COUNT(*) FROM "Movie";
+SELECT COUNT(*) FROM "Movie" WHERE "createdAt" >= CURRENT_DATE;</pre>
+        <div class="item-detail">Expect some <code>QUEUED → RUNNING → COMPLETED</code> movement after processor runs.</div>
+      </li>
+      <li>
+        <div class="item-title">Manual dispatch: Enqueue delta (small test)</div>
+        <div class="item-detail">Run <strong>Enqueue delta refresh</strong> once. Confirm one <code>DISCOVER</code> job appears with high priority (~240).</div>
+      </li>
+      <li>
+        <div class="item-title">Confirm Render API still healthy</div>
+        <pre>curl -sS 'https://api.watchpickr.com/api/movies?page=1&limit=1&region=IN'</pre>
+        <div class="item-detail">API should stay responsive; it should not log ingestion worker ticks.</div>
+      </li>
+    </ol>
+  </section>
+
+  <section id="phase3">
+    <h2><span class="phase-tag">Phase 3</span> Enable production scheduling</h2>
+    <p class="phase-desc">Turn on cron workflows in order after dry run succeeds.</p>
+    <ol>
+      <li>
+        <div class="item-title">Enable process-queue cron (every 45 min)</div>
+        <div class="item-detail">Already in <code>process-queue.yml</code>. Merging to <code>main</code> activates it. Monitor first 2–3 runs.</div>
+      </li>
+      <li>
+        <div class="item-title">Enable enqueue-daily (<code>10 */6 * * *</code>)</div>
+        <div class="item-detail">4×/day catalog top-up. Skips if daily target met, active catalog job exists, or queue above 10k watermark.</div>
+      </li>
+      <li>
+        <div class="item-title">Enable enqueue-delta (<code>20 */6 * * *</code>)</div>
+        <div class="item-detail">Recent releases lane; runs 10 min after daily enqueue each cycle.</div>
+      </li>
+      <li>
+        <div class="item-title">Enable maintenance</div>
+        <div class="item-detail">
+          <strong>02:30 UTC</strong> — snapshot + job history cleanup<br>
+          <strong>03:00 UTC</strong> — OMDb <code>DEEP_ENRICH</code> enqueue (up to ~950/day)
+        </div>
+      </li>
+      <li>
+        <div class="item-title">Switch Render to API-only (if not already)</div>
+        <div class="item-detail">Redeploy API after confirming GH processor is claiming jobs. This removes ingestion CPU/memory from Render.</div>
+      </li>
+    </ol>
+    <div class="callout ok"><strong>First 24h:</strong> Watch queue depth, TMDB 429s in logs, OMDb daily usage, net-new <code>Movie</code> rows per day.</div>
+  </section>
+
+  <section id="phase4">
+    <h2><span class="phase-tag">Phase 4</span> Backfill tuning (after stable week)</h2>
+    <ol>
+      <li>
+        <div class="item-title">Raise daily target gradually</div>
+        <div class="item-detail">Start <code>INGESTION_DAILY_TARGET=20000</code>. If queue stays under watermark and DB handles writes, try 30k–40k via workflow env or repo variables.</div>
+      </li>
+      <li>
+        <div class="item-title">Tune TMDB rate if needed</div>
+        <div class="item-detail"><code>TMDB_REQUESTS_PER_SECOND</code> default 8. If frequent 429s, lower to 5. If clean for days, try 10.</div>
+      </li>
+      <li>
+        <div class="item-title">Tune worker burst duration</div>
+        <div class="item-detail"><code>timeout 300</code> in process-queue.yml. Increase to 420–600 only if queue backlog grows and rate limits stay clean.</div>
+      </li>
+      <li>
+        <div class="item-title">Keep OMDb independent</div>
+        <div class="item-detail">Do not raise <code>INGESTION_OMDB_DAILY_LIMIT</code> above 1000. Missing ratings during catalog catch-up is expected.</div>
+      </li>
+      <li>
+        <div class="item-title">Schema sync discipline</div>
+        <div class="item-detail">When backend <code>prisma/schema.prisma</code> changes, copy to runner repo and redeploy both.</div>
+      </li>
+    </ol>
+  </section>
+
+  <section id="watch">
+    <h2>What to watch (success metrics)</h2>
+    <div class="grid2">
+      <div class="metric"><strong>Queue health</strong> Queued+running &lt; 10,000; stale RUNNING jobs recover</div>
+      <div class="metric"><strong>Catalog growth</strong> Net-new titles/day trending up toward 500k goal</div>
+      <div class="metric"><strong>Priority lanes</strong> Hindi + post-2010 titles before global fallback in logs</div>
+      <div class="metric"><strong>Rate limits</strong> TMDB 429 → backoff, not repeated failures</div>
+      <div class="metric"><strong>OMDb budget</strong> ≤950 regular enrichments/day; backlog reported separately</div>
+      <div class="metric"><strong>API isolation</strong> Render logs show HTTP only, no worker cron</div>
+    </div>
+    <pre style="margin-top:16px;">-- OMDb backlog (titles waiting enrichment)
+SELECT COUNT(*) FROM "Movie" WHERE "imdbId" IS NOT NULL AND "imdbRating" IS NULL;
+
+-- Today's net-new catalog
+SELECT COUNT(*) FROM "Movie" WHERE "createdAt" >= date_trunc('day', NOW() AT TIME ZONE 'UTC');</pre>
+  </section>
+
+  <section id="decisions">
+    <h2>Open decisions (from PRD)</h2>
+    <table>
+      <thead><tr><th>Question</th><th>Recommendation to start</th></tr></thead>
+      <tbody>
+        <tr><td>First-week daily net-new target?</td><td><strong>20k</strong> (current default). Lower to 10k if Neon write pressure or 429s spike.</td></tr>
+        <tr><td>Runner DB connection limit?</td><td><strong>connection_limit=2</strong> on GH <code>DATABASE_URL</code> (API uses 4).</td></tr>
+        <tr><td>Separate TV vs movie daily targets?</td><td>Not in MVP — single <code>INGESTION_DAILY_TARGET</code> covers both via pipeline.</td></tr>
+        <tr><td>Public vs private GH repo?</td><td><strong>Public</strong> for unlimited Actions minutes on the worker.</td></tr>
+        <tr><td>Phase 5 candidate staging (Wikidata, etc.)?</td><td>Defer until TMDB-only lane plateaus below growth goals.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Quick order of operations</h2>
+    <ol>
+      <li>Push runner repo + add GH secrets</li>
+      <li>Manual dispatch process-queue → verify DB job movement</li>
+      <li>Manual dispatch enqueue-delta → verify DISCOVER job</li>
+      <li>Enable all cron workflows</li>
+      <li>Confirm Render API-only + connection_limit=4</li>
+      <li>Monitor 24h, then tune Phase 4 knobs</li>
+    </ol>
+  </section>
+</body>
+</html>

@@ -1,0 +1,71 @@
+name: Ingestion maintenance
+
+on:
+  schedule:
+    - cron: '30 2 * * *'
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      task:
+        description: Maintenance task to run
+        required: true
+        default: auto
+        type: choice
+        options:
+          - auto
+          - cleanup
+          - enqueue-omdb
+
+concurrency:
+  group: ingestion-maintenance-${{ github.event.schedule || github.event.inputs.task }}
+  cancel-in-progress: false
+
+jobs:
+  maintenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NODE_ENV: production
+      INGESTION_QUEUE_HIGH_WATERMARK: '10000'
+      INGESTION_SNAPSHOT_RETENTION_DAYS: '1'
+      INGESTION_JOB_HISTORY_RETENTION_DAYS: '7'
+      INGESTION_OMDB_DAILY_LIMIT: '950'
+      INGESTION_OMDB_RETRY_RESERVE: '50'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Resolve maintenance task
+        id: task
+        run: |
+          INPUT="${{ github.event.inputs.task }}"
+          SCHEDULE="${{ github.event.schedule }}"
+          if [ "$INPUT" = "cleanup" ] || [ "$SCHEDULE" = "30 2 * * *" ]; then
+            echo "task=cleanup" >> "$GITHUB_OUTPUT"
+          elif [ "$INPUT" = "enqueue-omdb" ] || [ "$SCHEDULE" = "0 3 * * *" ]; then
+            echo "task=enqueue-omdb" >> "$GITHUB_OUTPUT"
+          elif [ "$INPUT" = "auto" ]; then
+            echo "task=cleanup" >> "$GITHUB_OUTPUT"
+          else
+            echo "task=$INPUT" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run snapshot and job history cleanup
+        if: steps.task.outputs.task == 'cleanup'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npm run ingestion:cleanup
+
+      - name: Enqueue OMDb enrichment jobs
+        if: steps.task.outputs.task == 'enqueue-omdb'
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
+        run: npm run ingestion:enqueue-omdb
