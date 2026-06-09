@@ -1203,13 +1203,16 @@ export const startIngestionWorker = (
     maxJobsPerTick?: number;
     staleRecoveryMinutes?: number;
     staleRecoveryIntervalMs?: number;
+    allowedJobTypes?: readonly string[];
   } = {},
 ) => {
   const pollIntervalMs = options.pollIntervalMs ?? 5_000;
   const maxJobsPerTick = Math.max(1, options.maxJobsPerTick ?? 10);
   const staleRecoveryMinutes = Math.max(5, options.staleRecoveryMinutes ?? 15);
   const staleRecoveryIntervalMs = Math.max(10_000, options.staleRecoveryIntervalMs ?? 60_000);
-  const store = createPrismaIngestionStore(prisma);
+  const store = createPrismaIngestionStore(prisma, {
+    allowedJobTypes: options.allowedJobTypes,
+  });
   let timer: NodeJS.Timeout | null = null;
   let stopped = false;
   let nextRecoveryAt = 0;

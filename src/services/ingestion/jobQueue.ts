@@ -328,6 +328,10 @@ export const buildRawSnapshotData = ({
   };
 };
 
+type IngestionStoreOptions = {
+  allowedJobTypes?: readonly string[];
+};
+
 export const createPrismaIngestionStore = (prisma: {
   ingestionJob: {
     findFirst: (args?: any) => Promise<IngestionJobRecord | null>;
@@ -357,7 +361,9 @@ export const createPrismaIngestionStore = (prisma: {
     createMany: (args: any) => Promise<any>;
   };
   $transaction?: (arg: any) => Promise<any>;
-}) => {
+}, options: IngestionStoreOptions = {}) => {
+  const allowedJobTypes = (options.allowedJobTypes ?? []).filter(Boolean);
+
   const findActiveJobByDedupeKey = async (dedupeKey: string) => {
     return prisma.ingestionJob.findFirst({
       where: {
@@ -416,13 +422,19 @@ export const createPrismaIngestionStore = (prisma: {
         throw new Error('claimNextJob requires Prisma ingestionJob.findUnique and updateMany support');
       }
 
-      const candidate = await prisma.ingestionJob.findFirst({
-        where: {
-          status: 'QUEUED',
-          availableAt: {
-            lte: now,
-          },
+      const claimWhere: Record<string, unknown> = {
+        status: 'QUEUED',
+        availableAt: {
+          lte: now,
         },
+      };
+
+      if (allowedJobTypes.length > 0) {
+        claimWhere.type = { in: allowedJobTypes };
+      }
+
+      const candidate = await prisma.ingestionJob.findFirst({
+        where: claimWhere,
         orderBy: [
           { priority: 'desc' },
           { availableAt: 'asc' },
@@ -855,6 +867,20 @@ export const createPrismaIngestionStore = (prisma: {
 
       return prisma.ingestionJob.count({
         where: {
+          status: {
+            in: ACTIVE_JOB_STATUSES,
+          },
+        },
+      });
+    },
+    async countQueuedJobsByType(type: string) {
+      if (!prisma.ingestionJob.count) {
+        throw new Error('countQueuedJobsByType requires Prisma ingestionJob.count support');
+      }
+
+      return prisma.ingestionJob.count({
+        where: {
+          type,
           status: {
             in: ACTIVE_JOB_STATUSES,
           },

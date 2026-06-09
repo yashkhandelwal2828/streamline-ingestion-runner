@@ -1,12 +1,59 @@
 import { PrismaClient } from '@prisma/client';
 import { buildDeepEnrichJobData } from './jobQueue';
-import { getOmdbDailyLimit } from './queueConfig';
+import {
+  getIngestionDailyTarget,
+  getOmdbDailyLimit,
+  getOmdbMaxFetchBacklog,
+  getOmdbMinCatalogProgressRatio,
+} from './queueConfig';
 
 type OmdbEnqueueStore = {
   getOmdbUsage: (now?: Date) => Promise<{ regular: number; retries: number; total: number }>;
   countQueuedAndRunningJobs: () => Promise<number>;
+  countQueuedJobsByType: (type: string) => Promise<number>;
+  countMoviesCreatedSince: (since: Date) => Promise<number>;
   findActiveJobByDedupeKey: (dedupeKey: string) => Promise<{ id: string } | null>;
   createJob: (data: Record<string, unknown>) => Promise<{ id: string }>;
+};
+
+export const shouldDeferOmdbEnqueue = async (
+  store: Pick<OmdbEnqueueStore, 'countQueuedJobsByType' | 'countMoviesCreatedSince'>,
+  options: {
+    now?: Date;
+    env?: Record<string, string | undefined>;
+  } = {},
+) => {
+  const env = options.env ?? process.env;
+  const now = options.now ?? new Date();
+  const fetchBacklog = await store.countQueuedJobsByType('FETCH');
+  const backlogLimit = getOmdbMaxFetchBacklog(env);
+
+  if (fetchBacklog > backlogLimit) {
+    return {
+      deferred: true,
+      skippedReason: 'fetch_backlog' as const,
+      fetchBacklog,
+      backlogLimit,
+    };
+  }
+
+  const dailyTarget = getIngestionDailyTarget(env);
+  const minProgressRatio = getOmdbMinCatalogProgressRatio(env);
+  const requiredToday = Math.floor(dailyTarget * minProgressRatio);
+  const dayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const createdToday = await store.countMoviesCreatedSince(dayStart);
+
+  if (createdToday < requiredToday) {
+    return {
+      deferred: true,
+      skippedReason: 'catalog_behind_target' as const,
+      createdToday,
+      requiredToday,
+      dailyTarget,
+    };
+  }
+
+  return { deferred: false };
 };
 
 export const findMoviesNeedingOmdbEnrichment = async (
@@ -43,6 +90,18 @@ export const enqueueOmdbBackfill = async (
 ) => {
   const now = options.now ?? new Date();
   const logger = options.logger ?? console;
+  const deferral = await shouldDeferOmdbEnqueue(store, { now });
+
+  if (deferral.deferred) {
+    logger.info(`OMDb enqueue deferred: ${deferral.skippedReason}.`);
+    return {
+      created: 0,
+      skipped: 0,
+      skippedReason: deferral.skippedReason,
+      deferral,
+    };
+  }
+
   const usage = await store.getOmdbUsage(now);
   const dailyLimit = getOmdbDailyLimit();
   const remainingBudget = Math.max(0, dailyLimit - usage.regular);

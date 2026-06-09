@@ -62,7 +62,45 @@ export const getIngestionQueueRefillTarget = (
 
 export const getIngestionDailyTarget = (
   env: Record<string, string | undefined> = process.env,
-) => parsePositiveIntEnv(env.INGESTION_DAILY_TARGET, 20_000, { min: 1 });
+) => parsePositiveIntEnv(env.INGESTION_DAILY_TARGET, 500, { min: 1 });
+
+const INGESTION_JOB_TYPES = [
+  'CATALOG_REFRESH',
+  'DISCOVER',
+  'FETCH',
+  'NORMALIZE',
+  'DEEP_ENRICH',
+] as const;
+
+export const parseIngestionAllowedJobTypes = (
+  env: Record<string, string | undefined> = process.env,
+) => {
+  const raw = String(env.INGESTION_ALLOWED_JOB_TYPES ?? '').trim();
+  if (!raw) {
+    return [] as string[];
+  }
+
+  const allowed = new Set(INGESTION_JOB_TYPES);
+  return raw
+    .split(',')
+    .map((value) => value.trim().toUpperCase())
+    .filter((value) => allowed.has(value as (typeof INGESTION_JOB_TYPES)[number]));
+};
+
+export const getOmdbMaxFetchBacklog = (
+  env: Record<string, string | undefined> = process.env,
+) => parsePositiveIntEnv(env.INGESTION_OMDB_MAX_FETCH_BACKLOG, 100, { min: 0, max: 10_000 });
+
+export const getOmdbMinCatalogProgressRatio = (
+  env: Record<string, string | undefined> = process.env,
+) => {
+  const parsed = Number.parseFloat(String(env.INGESTION_OMDB_MIN_CATALOG_PROGRESS_RATIO ?? ''));
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+    return 0.8;
+  }
+
+  return parsed;
+};
 
 export const isQueueAboveHighWatermark = (
   queuedAndRunningCount: number,

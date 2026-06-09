@@ -16,7 +16,7 @@ jobs:
     env:
       INGESTION_QUEUE_HIGH_WATERMARK: '10000'
       INGESTION_DELTA_PAGES_TO_SCAN: '2'
-      INGESTION_DELTA_TARGET_COUNT: '30'
+      INGESTION_DELTA_TARGET_COUNT: '50'
       INGESTION_DELTA_WINDOW_HOURS: '48'
     steps:
       - uses: actions/checkout@v4

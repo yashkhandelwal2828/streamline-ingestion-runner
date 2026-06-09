@@ -1,31 +1,27 @@
-name: Process ingestion queue
+name: Process OMDb enrichment
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '30 4,16 * * *'
   workflow_dispatch:
 
 concurrency:
-  group: process-ingestion-queue
+  group: process-ingestion-enrich
   cancel-in-progress: false
 
 jobs:
-  process-queue:
+  process-enrich:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     env:
       RUN_CRON_SCHEDULER: 'false'
-      INGESTION_ALLOWED_JOB_TYPES: 'FETCH,NORMALIZE'
-      TMDB_REQUESTS_PER_SECOND: '8'
-      TMDB_MAX_429_BACKOFF_SECONDS: '300'
+      INGESTION_ALLOWED_JOB_TYPES: 'DEEP_ENRICH'
       INGESTION_POLL_INTERVAL_MS: '5000'
-      INGESTION_MAX_JOBS_PER_TICK: '5'
+      INGESTION_MAX_JOBS_PER_TICK: '3'
       INGESTION_STALE_RECOVERY_MINUTES: '15'
       INGESTION_STALE_RECOVERY_INTERVAL_MS: '60000'
-      INGESTION_MIN_RELEASE_YEAR: '2010'
-      INGESTION_LANGUAGE_MODE: weighted
-      INGESTION_LANGUAGE_WEIGHTS: 'hi:100,en:20,ta:15,te:15,ml:10'
-      INGESTION_FALLBACK_TO_GLOBAL: 'true'
+      INGESTION_OMDB_DAILY_LIMIT: '200'
+      INGESTION_OMDB_RETRY_RESERVE: '50'
     steps:
       - uses: actions/checkout@v4
 
@@ -40,9 +36,9 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Run worker burst
+      - name: Run enrichment worker burst
         env:
           NODE_ENV: production
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
-        run: timeout 900 npm run start:worker || test $? -eq 124
+          OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
+        run: timeout 600 npm run start:worker || test $? -eq 124

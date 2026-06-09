@@ -1,25 +1,25 @@
-name: Process ingestion queue
+name: Process catalog discovery
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '15 */6 * * *'
   workflow_dispatch:
 
 concurrency:
-  group: process-ingestion-queue
+  group: process-ingestion-catalog
   cancel-in-progress: false
 
 jobs:
-  process-queue:
+  process-catalog:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     env:
       RUN_CRON_SCHEDULER: 'false'
-      INGESTION_ALLOWED_JOB_TYPES: 'FETCH,NORMALIZE'
+      INGESTION_ALLOWED_JOB_TYPES: 'DISCOVER,CATALOG_REFRESH'
       TMDB_REQUESTS_PER_SECOND: '8'
       TMDB_MAX_429_BACKOFF_SECONDS: '300'
       INGESTION_POLL_INTERVAL_MS: '5000'
-      INGESTION_MAX_JOBS_PER_TICK: '5'
+      INGESTION_MAX_JOBS_PER_TICK: '1'
       INGESTION_STALE_RECOVERY_MINUTES: '15'
       INGESTION_STALE_RECOVERY_INTERVAL_MS: '60000'
       INGESTION_MIN_RELEASE_YEAR: '2010'
@@ -40,9 +40,9 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Run worker burst
+      - name: Run catalog worker burst
         env:
           NODE_ENV: production
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
-        run: timeout 900 npm run start:worker || test $? -eq 124
+        run: timeout 1800 npm run start:worker || test $? -eq 124
