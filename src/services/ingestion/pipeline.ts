@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { parseOmdbPlot } from '../movieSynopsis';
 import { getRatings } from '../omdb';
 import { discoverMovies, discoverTV, getDailyExportIds, getMovieDetails, getTVDetails } from '../tmdb';
 import {
@@ -483,6 +484,10 @@ const buildMovieRecordFromTmdb = (details: Record<string, any>, mediaType: 'movi
     mediaType,
     title: mediaType === 'movie' ? details.title : details.name,
     overview: details.overview || '',
+    tagline:
+      typeof details.tagline === 'string' && details.tagline.trim().length > 0
+        ? details.tagline.trim()
+        : null,
     posterPath: details.poster_path ?? null,
     releaseDate:
       mediaType === 'movie'
@@ -534,6 +539,7 @@ const buildDeepEnrichUpdate = (omdbData: Record<string, any>) => {
     omdbData.imdbVotes && omdbData.imdbVotes !== 'N/A'
       ? Number.parseInt(String(omdbData.imdbVotes).replace(/,/g, ''), 10)
       : null;
+  const plotFull = parseOmdbPlot(omdbData.Plot);
 
   return {
     imdbRating: omdbData.imdbRating && omdbData.imdbRating !== 'N/A' ? Number.parseFloat(omdbData.imdbRating) : null,
@@ -541,6 +547,7 @@ const buildDeepEnrichUpdate = (omdbData: Record<string, any>) => {
     metascore: omdbData.Metascore && omdbData.Metascore !== 'N/A' ? Number.parseInt(omdbData.Metascore, 10) : null,
     imdbVotes: omdbData.imdbVotes && omdbData.imdbVotes !== 'N/A' ? omdbData.imdbVotes : null,
     imdbVotesNumeric: Number.isNaN(imdbVotesNumeric) ? null : imdbVotesNumeric,
+    ...(plotFull ? { plotFull } : {}),
   };
 };
 

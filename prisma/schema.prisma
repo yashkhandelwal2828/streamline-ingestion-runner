@@ -18,6 +18,8 @@ model Movie {
   mediaType            String    @default("movie") // "movie" or "tv"
   title                String    // For TV: maps from TMDB "name"
   overview             String
+  plotFull             String?   // OMDb Plot when plot=full and not N/A
+  tagline              String?   // TMDB tagline when present
   posterPath           String?
   releaseDate          DateTime? // For TV: maps from TMDB "first_air_date"
   genres               String[]

@@ -63,9 +63,13 @@ export const findMoviesNeedingOmdbEnrichment = async (
   return prisma.movie.findMany({
     where: {
       imdbId: { not: null },
-      imdbRating: null,
+      OR: [
+        { imdbRating: null },
+        { plotFull: null },
+      ],
     },
     orderBy: [
+      { imdbRating: 'asc' },
       { releaseDate: 'desc' },
       { updatedAt: 'asc' },
     ],
