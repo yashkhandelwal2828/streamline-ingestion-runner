@@ -865,13 +865,17 @@ export const createPrismaIngestionStore = (prisma: {
         throw new Error('countQueuedAndRunningJobs requires Prisma ingestionJob.count support');
       }
 
-      return prisma.ingestionJob.count({
-        where: {
-          status: {
-            in: ACTIVE_JOB_STATUSES,
-          },
+      const where: Record<string, any> = {
+        status: {
+          in: ACTIVE_JOB_STATUSES,
         },
-      });
+      };
+
+      if (allowedJobTypes.length > 0) {
+        where.type = { in: allowedJobTypes };
+      }
+
+      return prisma.ingestionJob.count({ where });
     },
     async countQueuedJobsByType(type: string) {
       if (!prisma.ingestionJob.count) {

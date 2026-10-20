@@ -4,6 +4,17 @@ on:
   schedule:
     - cron: '*/15 * * * *'
   workflow_dispatch:
+    inputs:
+      chain_depth:
+        description: 'Internal: self-dispatch hop counter (keep 0 for a fresh chain)'
+        required: false
+        default: '0'
+        type: string
+
+# Needed so the workflow can dispatch its own next burst with the built-in token.
+permissions:
+  contents: read
+  actions: write
 
 concurrency:
   group: process-ingestion-queue
@@ -12,7 +23,7 @@ concurrency:
 jobs:
   process-queue:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 75
     env:
       RUN_CRON_SCHEDULER: 'false'
       INGESTION_ALLOWED_JOB_TYPES: 'FETCH,NORMALIZE'
@@ -26,6 +37,13 @@ jobs:
       INGESTION_LANGUAGE_MODE: weighted
       INGESTION_LANGUAGE_WEIGHTS: 'hi:100,en:20,ta:15,te:15,ml:10'
       INGESTION_FALLBACK_TO_GLOBAL: 'true'
+      # Emit a summary line every minute and a final one when the burst stops.
+      INGESTION_WORKER_SUMMARY_INTERVAL_MS: '60000'
+      # Stop 2 minutes before the external timeout so the summary file is always written.
+      INGESTION_WORKER_BURST_SECONDS: '3180'
+      INGESTION_WORKER_SUMMARY_FILE: 'worker-summary.json'
+      # Cap on self-dispatched bursts so a stuck backlog cannot run forever unattended.
+      INGESTION_WORKER_MAX_CHAIN_HOPS: '24'
     steps:
       - uses: actions/checkout@v4
 
@@ -45,4 +63,29 @@ jobs:
           NODE_ENV: production
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
-        run: timeout 900 npm run start:worker || test $? -eq 124
+        run: timeout 3300 npm run start:worker || test $? -eq 124
+
+      - name: Report worker burst summary
+        if: always()
+        run: |
+          if [ -f "$INGESTION_WORKER_SUMMARY_FILE" ]; then
+            cat "$INGESTION_WORKER_SUMMARY_FILE"
+          else
+            echo '{"event":"ingestion_worker_summary","reason":"missing","note":"worker did not write a summary file"}'
+          fi
+
+      - name: Continue queue processing
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CHAIN_DEPTH: ${{ github.event.inputs.chain_depth || '0' }}
+        run: |
+          DECISION=$(node dist/scripts/ingestionWorkerChainDecision.js)
+          echo "Chain decision: $DECISION"
+          if echo "$DECISION" | grep -q '"shouldChain":true'; then
+            NEXT_DEPTH=$((CHAIN_DEPTH + 1))
+            echo "Dispatching next burst (hop $NEXT_DEPTH/$INGESTION_WORKER_MAX_CHAIN_HOPS)."
+            gh workflow run process-queue.yml --ref "$GITHUB_REF_NAME" -f chain_depth="$NEXT_DEPTH"
+          else
+            echo "Not chaining: queue is drained or the hop limit was reached."
+          fi
