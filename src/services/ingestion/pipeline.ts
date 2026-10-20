@@ -50,6 +50,7 @@ type IngestionStore = {
   findMovieById?: (movieId: number) => Promise<Record<string, any> | null>;
   updateMovieById?: (movieId: number, data: Record<string, any>) => Promise<any>;
   updateMovieByTmdbId?: (tmdbId: number, mediaType: 'movie' | 'tv', data: Record<string, any>) => Promise<any>;
+  countQueuedAndRunningJobs?: () => Promise<number>;
 };
 
 type PipelineDeps = {
@@ -1199,8 +1200,107 @@ export const runNextIngestionJob = async (
       });
     }
 
-    return { processed: true, jobId: job.id, type: job.type, failed: true };
+    return {
+      processed: true,
+      jobId: job.id,
+      type: job.type,
+      failed: true,
+      deadLettered: attempts >= job.maxAttempts,
+      attempts,
+      errorMessage,
+    };
   }
+};
+
+export type IngestionWorkerTickResult = {
+  processed: boolean;
+  jobId?: string;
+  type?: string;
+  failed?: boolean;
+  deadLettered?: boolean;
+  attempts?: number;
+  errorMessage?: string;
+};
+
+export type IngestionWorkerSummary = {
+  event: 'ingestion_worker_summary';
+  reason: string;
+  startedAt: string;
+  uptimeSeconds: number;
+  attempts: number;
+  emptyPolls: number;
+  processed: number;
+  failed: number;
+  deadLettered: number;
+  jobsPerMinute: number;
+  byType: Record<string, { processed: number; failed: number }>;
+  lastError: string | null;
+  backlog: number | null;
+};
+
+export const createWorkerStats = (startedAtMs = Date.now()) => ({
+  startedAtMs,
+  attempts: 0,
+  emptyPolls: 0,
+  processed: 0,
+  failed: 0,
+  deadLettered: 0,
+  byType: {} as Record<string, { processed: number; failed: number }>,
+  lastError: null as string | null,
+});
+
+export type IngestionWorkerStats = ReturnType<typeof createWorkerStats>;
+
+export const recordWorkerTickResult = (
+  stats: IngestionWorkerStats,
+  result: IngestionWorkerTickResult | null | undefined,
+) => {
+  stats.attempts += 1;
+
+  if (!result?.processed) {
+    stats.emptyPolls += 1;
+    return;
+  }
+
+  const type = result.type ?? 'UNKNOWN';
+  stats.processed += 1;
+  stats.byType[type] = stats.byType[type] ?? { processed: 0, failed: 0 };
+  stats.byType[type].processed += 1;
+
+  if (result.failed) {
+    stats.failed += 1;
+    stats.byType[type].failed += 1;
+    if (result.deadLettered) {
+      stats.deadLettered += 1;
+    }
+    stats.lastError = result.errorMessage ?? stats.lastError;
+  }
+};
+
+export const buildWorkerSummary = (
+  stats: IngestionWorkerStats,
+  reason: string,
+  backlog: number | null = null,
+  nowMs = Date.now(),
+): IngestionWorkerSummary => {
+  const uptimeSeconds = Math.max(0, Math.round((nowMs - stats.startedAtMs) / 1000));
+  const minutes = uptimeSeconds / 60;
+
+  return {
+    event: 'ingestion_worker_summary',
+    reason,
+    startedAt: new Date(stats.startedAtMs).toISOString(),
+    uptimeSeconds,
+    attempts: stats.attempts,
+    emptyPolls: stats.emptyPolls,
+    processed: stats.processed,
+    failed: stats.failed,
+    deadLettered: stats.deadLettered,
+    jobsPerMinute: minutes > 0 ? Math.round((stats.processed / minutes) * 10) / 10 : 0,
+    byType: stats.byType,
+    lastError: stats.lastError,
+    backlog,
+  };
 };
 
 export const startIngestionWorker = (
@@ -1211,26 +1311,54 @@ export const startIngestionWorker = (
     staleRecoveryMinutes?: number;
     staleRecoveryIntervalMs?: number;
     allowedJobTypes?: readonly string[];
+    summaryIntervalMs?: number;
   } = {},
 ) => {
   const pollIntervalMs = options.pollIntervalMs ?? 5_000;
   const maxJobsPerTick = Math.max(1, options.maxJobsPerTick ?? 10);
   const staleRecoveryMinutes = Math.max(5, options.staleRecoveryMinutes ?? 15);
   const staleRecoveryIntervalMs = Math.max(10_000, options.staleRecoveryIntervalMs ?? 60_000);
+  const summaryIntervalMs = Math.max(10_000, options.summaryIntervalMs ?? 60_000);
   const store = createPrismaIngestionStore(prisma, {
     allowedJobTypes: options.allowedJobTypes,
   });
+  const stats = createWorkerStats();
   let timer: NodeJS.Timeout | null = null;
   let stopped = false;
   let nextRecoveryAt = 0;
+  let nextSummaryAt = Date.now() + summaryIntervalMs;
   let pauseUntil = 0;
+  let activeTick: Promise<void> | null = null;
+
+  const getBacklog = async (): Promise<number | null> => {
+    if (!store.countQueuedAndRunningJobs) {
+      return null;
+    }
+
+    try {
+      return await store.countQueuedAndRunningJobs();
+    } catch {
+      return null;
+    }
+  };
+
+  const logSummary = async (reason: string): Promise<IngestionWorkerSummary> => {
+    const summary = buildWorkerSummary(stats, reason, await getBacklog());
+    console.log(JSON.stringify(summary));
+    return summary;
+  };
 
   const scheduleNextRun = () => {
     if (stopped) {
       return;
     }
 
-    timer = setTimeout(runLoop, pollIntervalMs);
+    timer = setTimeout(() => {
+      activeTick = runLoop();
+      void activeTick.finally(() => {
+        activeTick = null;
+      });
+    }, pollIntervalMs);
   };
 
   const runLoop = async () => {
@@ -1253,11 +1381,27 @@ export const startIngestionWorker = (
 
       for (let i = 0; i < maxJobsPerTick; i += 1) {
         const result = await runIngestionWorkerTick(store, prisma);
+        recordWorkerTickResult(stats, result);
+
         if (!result?.processed) {
           break;
         }
+
+        if (result.failed) {
+          console.warn(
+            JSON.stringify({
+              event: 'ingestion_job_failed',
+              jobId: result.jobId ?? null,
+              type: result.type ?? null,
+              attempts: result.attempts ?? null,
+              deadLettered: Boolean(result.deadLettered),
+              errorMessage: result.errorMessage ?? null,
+            }),
+          );
+        }
       }
     } catch (error) {
+      stats.lastError = error instanceof Error ? error.message : String(error);
       if (isStorageLimitExceededError(error)) {
         pauseUntil = Date.now() + STORAGE_LIMIT_RETRY_COOLDOWN_MS;
         console.error(
@@ -1274,6 +1418,10 @@ export const startIngestionWorker = (
         console.error('Ingestion worker loop failed:', error);
       }
     } finally {
+      if (Date.now() >= nextSummaryAt) {
+        nextSummaryAt = Date.now() + summaryIntervalMs;
+        await logSummary('interval');
+      }
       scheduleNextRun();
     }
   };
@@ -1287,5 +1435,14 @@ export const startIngestionWorker = (
         clearTimeout(timer);
       }
     },
+    async drain(timeoutMs = 5_000) {
+      if (!activeTick) {
+        return;
+      }
+
+      await Promise.race([activeTick.catch(() => undefined), waitFor(timeoutMs)]);
+    },
+    logSummary,
+    getSummary: () => buildWorkerSummary(stats, 'snapshot', null),
   };
 };
