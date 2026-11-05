@@ -1008,7 +1008,8 @@ const processNormalizeJob = async (
   const movieRecord = buildMovieRecordFromTmdb(snapshot.payload, mediaType);
   const minReleaseYear = getIngestionMinReleaseYear();
 
-  if (isReleaseDateBeforeMinYear(movieRecord.releaseDate, minReleaseYear)) {
+  // Netflix's official Top 10 regularly charts older titles; the catalog-growth year floor must not drop them.
+  if (job.source !== 'netflix_top10' && isReleaseDateBeforeMinYear(movieRecord.releaseDate, minReleaseYear)) {
     await store.completeJob(job.id, {
       skipped: 'release_year_before_floor',
       tmdbId: movieRecord.tmdbId,

@@ -11,6 +11,7 @@
     "ingestion:enqueue-delta": "node dist/scripts/ingestionEnqueueDelta.js",
     "ingestion:cleanup": "node dist/scripts/ingestionCleanup.js",
     "ingestion:enqueue-omdb": "node dist/scripts/ingestionEnqueueOmdb.js",
+    "ingestion:netflix-top10": "node dist/scripts/netflixTop10Sync.js",
     "test": "node --test tests/**/*.test.js"
   },
   "dependencies": {

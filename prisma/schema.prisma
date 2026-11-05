@@ -188,3 +188,38 @@ model UserPreference {
   updatedAt           DateTime @updatedAt
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+// Official Netflix weekly Top 10 (https://www.netflix.com/tudum/top10). Additive; no relation to
+// existing columns. Entries join to Movie at read time via (tmdbId, mediaType) so they may be
+// ingested before the catalog enrichment pipeline has created the Movie row.
+model NetflixTop10Entry {
+  id           Int      @id @default(autoincrement())
+  scope        String   // ISO 3166-1 alpha-2 country code, or "GLOBAL"
+  week         DateTime @db.Date // last day of the Netflix week (Sunday)
+  category     String   // films | tv (countries); films-english | films-non-english | tv-english | tv-non-english (global)
+  rank         Int
+  weeksInTop10 Int
+  showTitle    String
+  seasonTitle  String?
+  mediaType    String   // "movie" or "tv"
+  tmdbId       Int?     // null when no confident TMDB match
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([scope, week, category, rank])
+  @@index([scope, category, week])
+  @@index([tmdbId, mediaType])
+}
+
+// Cache of Netflix title -> TMDB id lookups so weekly runs do not repeat TMDB searches.
+model NetflixTitleMatch {
+  id           Int      @id @default(autoincrement())
+  titleKey     String   // normalized Netflix title
+  mediaType    String
+  tmdbId       Int?
+  status       String   // MATCHED | UNMATCHED
+  matchedTitle String?
+  checkedAt    DateTime @default(now())
+
+  @@unique([titleKey, mediaType])
+}

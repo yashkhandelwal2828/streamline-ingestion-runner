@@ -270,6 +270,23 @@ export const getTVGenres = async () => {
   }
 };
 
+export type TmdbTitleSearchOptions = { year?: number | null };
+
+/** Title search used by the Netflix Top 10 matcher; shares the TMDB governor and retry policy. */
+export const searchTitle = async (query: string, mediaType: 'movie' | 'tv', options: TmdbTitleSearchOptions = {}) => {
+  const params: Record<string, string | number | boolean> = { query, include_adult: false, language: 'en-US', page: 1 };
+  if (options.year) {
+    params[mediaType === 'movie' ? 'year' : 'first_air_date_year'] = options.year;
+  }
+  return withRetry(
+    () => withTmdbGovernor(() => getTmdbClient().get(`/search/${mediaType}`, { params })).then((response) => response.data?.results ?? []),
+    `searchTitle(${mediaType}:${query})`,
+  ).catch((error) => {
+    logTmdbError(`Error searching TMDB ${mediaType} for "${query}":`, error);
+    throw error;
+  });
+};
+
 export const summarizeTmdbErrorForLog = buildTmdbErrorSummary;
 
 type ExportMediaType = 'movie' | 'tv';

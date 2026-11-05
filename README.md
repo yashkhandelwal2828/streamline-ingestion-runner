@@ -42,3 +42,14 @@ The final summary is also written to `worker-summary.json` and printed by the wo
 ## License
 
 MIT
+
+## Netflix official Top 10 (weekly)
+
+`npm run ingestion:netflix-top10` downloads Netflix's public weekly Top 10 data
+(`https://www.netflix.com/tudum/top10/data/all-weeks-countries.tsv` and `all-weeks-global.tsv`), matches titles to
+TMDB (exact normalized title + media type, never released after the chart week; cached in `NetflixTitleMatch`),
+stores the newest week in `NetflixTop10Entry`, and queues titles missing from `Movie` through the normal
+FETCH → NORMALIZE → DEEP_ENRICH pipeline (source `netflix_top10`, which bypasses the release-year floor).
+Scheduled by `.github/workflows/netflix-top10-weekly.yml` (Wednesdays 06:00 UTC). Env: `NETFLIX_TOP10_WEEKS`,
+`NETFLIX_TOP10_DRY_RUN`, `NETFLIX_TOP10_SOURCE_DIR`, `NETFLIX_TOP10_MAX_SEARCHES`. Tables are created by the
+backend repo's migration `20261105120000_add_netflix_top10`; this repo only mirrors the Prisma models.

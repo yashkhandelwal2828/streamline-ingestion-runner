@@ -1,0 +1,51 @@
+name: Netflix official Top 10 (weekly)
+
+# Netflix publishes the previous Mon-Sun week's official Top 10 on Tuesdays (~12:00 UTC / 08:00 ET).
+# Runs Wednesday 06:00 UTC to leave a safety margin. GitHub cron can be delayed by hours; the job is
+# idempotent (it replaces each country/week atomically), so late or repeated runs are safe.
+on:
+  schedule:
+    - cron: '0 6 * * 3'
+  workflow_dispatch:
+    inputs:
+      weeks:
+        description: 'Newest weeks to ingest (1 for the weekly run; e.g. 8 for the first backfill)'
+        required: false
+        default: '1'
+      dry_run:
+        description: 'Parse and report only: no TMDB calls, no database writes'
+        required: false
+        default: 'false'
+
+concurrency:
+  group: netflix-top10-weekly
+  cancel-in-progress: false
+
+jobs:
+  netflix-top10:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --include=dev
+
+      - name: Build
+        run: npm run build
+
+      - name: Ingest Netflix Top 10
+        env:
+          NODE_ENV: production
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          TMDB_REQUESTS_PER_SECOND: '8'
+          TMDB_MAX_429_BACKOFF_SECONDS: '300'
+          NETFLIX_TOP10_WEEKS: ${{ github.event.inputs.weeks || '1' }}
+          NETFLIX_TOP10_DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: npm run ingestion:netflix-top10
