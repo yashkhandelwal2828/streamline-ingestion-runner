@@ -616,6 +616,8 @@ export const createPrismaIngestionStore = (prisma: {
         throw new Error('upsertMovie requires Prisma movie support');
       }
 
+      // A re-fetch that comes back without artwork must not erase a poster we already have.
+      const { posterPath, ...withoutPoster } = movie;
       return prisma.movie.upsert({
         where: {
           tmdbId_mediaType: {
@@ -623,7 +625,7 @@ export const createPrismaIngestionStore = (prisma: {
             mediaType: movie.mediaType,
           },
         },
-        update: movie,
+        update: posterPath ? movie : withoutPoster,
         create: movie,
       });
     },

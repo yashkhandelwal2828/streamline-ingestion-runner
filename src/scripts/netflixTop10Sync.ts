@@ -1,7 +1,7 @@
 import axios from 'axios';
 import fs from 'node:fs';
 import path from 'node:path';
-import { searchTitle } from '../services/tmdb';
+import { searchTitle, searchMulti, getAlternativeTitles, getPosterCandidates } from '../services/tmdb';
 import { syncNetflixTop10, NETFLIX_COUNTRIES_URL, NETFLIX_GLOBAL_URL } from '../services/netflixTop10/sync';
 import { createScriptContext, disconnectPrisma } from './scriptUtils';
 
@@ -16,6 +16,7 @@ const SCRIPT_NAME = 'ingestion:netflix-top10';
  *   NETFLIX_TOP10_DRY_RUN=true    parse and report only; no TMDB calls, no database writes
  *   NETFLIX_TOP10_SOURCE_DIR      read all-weeks-countries.tsv / all-weeks-global.tsv from a local directory
  *   NETFLIX_TOP10_MAX_SEARCHES    cap on TMDB searches per run (default 3000)
+ *   NETFLIX_TOP10_FORCE_RECHECK=true  re-search every unmatched title now (after a matcher change)
  */
 const readText = async (url: string, sourceDir: string | undefined) => {
   if (sourceDir) {
@@ -36,7 +37,8 @@ const main = async () => {
   const dryRun = ['true', '1', 'yes'].includes(String(process.env.NETFLIX_TOP10_DRY_RUN ?? '').toLowerCase());
   const sourceDir = process.env.NETFLIX_TOP10_SOURCE_DIR || undefined;
   const maxSearches = Number.parseInt(process.env.NETFLIX_TOP10_MAX_SEARCHES ?? '', 10) || undefined;
-  console.log(`[${SCRIPT_NAME}] starting`, { weeks, dryRun, sourceDir: sourceDir ?? null });
+  const forceRecheckUnmatched = ['true', '1', 'yes'].includes(String(process.env.NETFLIX_TOP10_FORCE_RECHECK ?? '').toLowerCase());
+  console.log(`[${SCRIPT_NAME}] starting`, { weeks, dryRun, forceRecheckUnmatched, sourceDir: sourceDir ?? null });
 
   const { prisma, store } = createScriptContext();
   try {
@@ -45,8 +47,11 @@ const main = async () => {
       store: store as any,
       fetchText: (url) => readText(url, sourceDir),
       search: (title, mediaType) => searchTitle(title, mediaType),
+      searchMulti: (title) => searchMulti(title),
+      alternativeTitles: (tmdbId, mediaType) => getAlternativeTitles(tmdbId, mediaType),
+      fetchPosters: (tmdbId, mediaType, originalLanguage) => getPosterCandidates(tmdbId, mediaType, originalLanguage),
       log: (message, data) => console.log(JSON.stringify({ script: SCRIPT_NAME, message, ...data })),
-    }, { weeks, dryRun, maxSearches, countriesUrl: NETFLIX_COUNTRIES_URL, globalUrl: NETFLIX_GLOBAL_URL });
+    }, { weeks, dryRun, maxSearches, forceRecheckUnmatched, countriesUrl: NETFLIX_COUNTRIES_URL, globalUrl: NETFLIX_GLOBAL_URL });
     if (!dryRun && summary.entryMatchRate < 0.5) {
       console.warn(`[${SCRIPT_NAME}] low TMDB match rate ${summary.entryMatchRate}; check TMDB availability or Netflix title formatting`);
     }

@@ -82,8 +82,8 @@ test('queues only titles missing from Movie through the FETCH pipeline with the 
   assert.ok(calls.jobs[0].priority >= 200, 'must reach OMDb deep enrichment');
 });
 
-test('uses the match cache and rechecks stale unmatched titles only', async () => {
-  const recent = new Date('2026-11-01T00:00:00Z');
+test('uses the match cache and rechecks unmatched titles older than the recheck interval only', async () => {
+  const recent = new Date('2026-11-04T05:00:00Z');
   const stale = new Date('2026-09-01T00:00:00Z');
   const { deps, calls } = makeDeps({
     searchResults: results,
@@ -120,4 +120,49 @@ test('refuses to continue when the downloaded files contain no usable rows', asy
   const { deps } = makeDeps();
   deps.fetchText = async () => 'week\tcategory\tweekly_rank\tshow_title\tseason_title\tcumulative_weeks_in_top_10\ncountry_iso2\n';
   await assert.rejects(syncNetflixTop10(deps));
+});
+
+test('re-searches unmatched titles with the improved resolver and reports recovered matches', async () => {
+  const { deps, calls } = makeDeps({
+    searchResults: { ...results, 'tv:Akka': [{ id: 902, name: 'Akka', first_air_date: '2026-10-20' }] },
+    cachedMatches: [{ titleKey: 'akka', mediaType: 'tv', tmdbId: null, status: 'UNMATCHED', checkedAt: new Date('2026-11-04T01:00:00Z') }],
+  });
+  const summary = await syncNetflixTop10(deps, { forceRecheckUnmatched: true });
+  assert.ok(calls.searches.some(([title, type]) => title === 'Akka' && type === 'tv'));
+  assert.equal(summary.recoveredMatches, 1);
+  assert.equal(summary.matchStrategies.exact, 3 - 1 /* gajab raat + akka (exact); no such title unmatched */);
+});
+
+const posterDeps = ({ posterless, posters }) => {
+  const { deps, calls } = makeDeps({ searchResults: results, existingMovies: [{ tmdbId: 501 }, { tmdbId: 902 }] });
+  calls.movieUpdates = [];
+  deps.prisma.movie.findMany = async (args) => (args.select?.originalLanguage ? posterless.filter((m) => args.where.mediaType === m.mediaType) : [{ tmdbId: 501 }, { tmdbId: 902 }]);
+  deps.prisma.movie.update = async (args) => { calls.movieUpdates.push(args); };
+  deps.fetchPosters = async (tmdbId) => { if (posters[tmdbId] instanceof Error) throw posters[tmdbId]; return posters[tmdbId] ?? []; };
+  return { deps, calls };
+};
+
+test('re-fetches posters for matched catalog rows saved without one', async () => {
+  const { deps, calls } = posterDeps({
+    posterless: [{ id: 11, tmdbId: 501, mediaType: 'movie', originalLanguage: 'hi' }],
+    posters: { 501: [{ file_path: '/hindi.jpg', iso_639_1: 'hi', vote_average: 5 }] },
+  });
+  const summary = await syncNetflixTop10(deps);
+  assert.deepEqual(calls.movieUpdates, [{ where: { id: 11 }, data: { posterPath: '/hindi.jpg' } }]);
+  assert.equal(summary.postersRepaired, 1);
+  assert.equal(summary.postersStillMissing, 0);
+});
+
+test('counts titles TMDB still has no poster for, and survives a failed poster lookup', async () => {
+  const { deps, calls } = posterDeps({
+    posterless: [
+      { id: 11, tmdbId: 501, mediaType: 'movie', originalLanguage: 'hi' },
+      { id: 12, tmdbId: 902, mediaType: 'tv', originalLanguage: 'en' },
+    ],
+    posters: { 501: [], 902: new Error('429') },
+  });
+  const summary = await syncNetflixTop10(deps);
+  assert.equal(calls.movieUpdates.length, 0);
+  assert.equal(summary.postersRepaired, 0);
+  assert.equal(summary.postersStillMissing, 2);
 });

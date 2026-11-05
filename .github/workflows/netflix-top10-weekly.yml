@@ -3,15 +3,21 @@ name: Netflix official Top 10 (weekly)
 # Netflix publishes the previous Mon-Sun week's official Top 10 on Tuesdays (~12:00 UTC / 08:00 ET).
 # Runs Wednesday 06:00 UTC to leave a safety margin. GitHub cron can be delayed by hours; the job is
 # idempotent (it replaces each country/week atomically), so late or repeated runs are safe.
+# It also runs Friday and Sunday as a repair pass: TMDB often adds a just-premiered title (or its poster)
+# a few days late, and the job re-searches unmatched titles and re-fetches missing posters every run.
 on:
   schedule:
-    - cron: '0 6 * * 3'
+    - cron: '0 6 * * 3,5,0'
   workflow_dispatch:
     inputs:
       weeks:
         description: 'Newest weeks to ingest (1 for the weekly run; e.g. 8 for the first backfill)'
         required: false
         default: '1'
+      force_recheck:
+        description: 'Re-search every unmatched title now (use once after a matcher change)'
+        required: false
+        default: 'false'
       dry_run:
         description: 'Parse and report only: no TMDB calls, no database writes'
         required: false
@@ -48,4 +54,5 @@ jobs:
           TMDB_MAX_429_BACKOFF_SECONDS: '300'
           NETFLIX_TOP10_WEEKS: ${{ github.event.inputs.weeks || '1' }}
           NETFLIX_TOP10_DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          NETFLIX_TOP10_FORCE_RECHECK: ${{ github.event.inputs.force_recheck || 'false' }}
         run: npm run ingestion:netflix-top10

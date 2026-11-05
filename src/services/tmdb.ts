@@ -287,6 +287,45 @@ export const searchTitle = async (query: string, mediaType: 'movie' | 'tv', opti
   });
 };
 
+/** /search/multi, filtered by the caller to the wanted media type. */
+export const searchMulti = async (query: string) =>
+  withRetry(
+    () => withTmdbGovernor(() => getTmdbClient().get('/search/multi', { params: { query, include_adult: false, language: 'en-US', page: 1 } })).then((response) => response.data?.results ?? []),
+    `searchMulti(${query})`,
+  ).catch((error) => {
+    logTmdbError(`Error searching TMDB multi for "${query}":`, error);
+    throw error;
+  });
+
+/** Alternative (regional/translated) titles for one TMDB entry. */
+export const getAlternativeTitles = async (tmdbId: number, mediaType: 'movie' | 'tv'): Promise<string[]> =>
+  withRetry(
+    () => withTmdbGovernor(() => getTmdbClient().get(`/${mediaType}/${tmdbId}/alternative_titles`)).then((response) => {
+      const rows: Array<{ title?: string }> = response.data?.titles ?? response.data?.results ?? [];
+      return rows.map((row) => row.title).filter((value): value is string => typeof value === 'string' && value.length > 0);
+    }),
+    `getAlternativeTitles(${mediaType}:${tmdbId})`,
+  ).catch((error) => {
+    logTmdbError(`Error fetching alternative titles for ${mediaType} ${tmdbId}:`, error);
+    throw error;
+  });
+
+/**
+ * Posters for one title across the languages that matter. /movie/{id} only returns a poster_path for the
+ * request language, so regional titles whose artwork is tagged Hindi, Tamil, etc. can come back null.
+ */
+export const getPosterCandidates = async (tmdbId: number, mediaType: 'movie' | 'tv', originalLanguage?: string | null) => {
+  const languages = [...new Set([originalLanguage, 'en', 'null'].filter((value): value is string => Boolean(value)))];
+  return withRetry(
+    () => withTmdbGovernor(() => getTmdbClient().get(`/${mediaType}/${tmdbId}/images`, { params: { include_image_language: languages.join(',') } }))
+      .then((response) => (response.data?.posters ?? []) as Array<{ file_path?: string; iso_639_1?: string | null; vote_average?: number; vote_count?: number }>),
+    `getPosterCandidates(${mediaType}:${tmdbId})`,
+  ).catch((error) => {
+    logTmdbError(`Error fetching posters for ${mediaType} ${tmdbId}:`, error);
+    throw error;
+  });
+};
+
 export const summarizeTmdbErrorForLog = buildTmdbErrorSummary;
 
 type ExportMediaType = 'movie' | 'tv';
