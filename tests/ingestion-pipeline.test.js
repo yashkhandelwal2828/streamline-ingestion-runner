@@ -171,8 +171,8 @@ test('findMoviesNeedingOmdbEnrichment includes rated titles missing plotFull', a
     OR: [{ imdbRating: null }, { plotFull: null }],
   });
   assert.deepEqual(calls[0].orderBy, [
-    { imdbRating: 'asc' },
-    { releaseDate: 'desc' },
+    { imdbRating: { sort: 'asc', nulls: 'first' } },
+    { releaseDate: { sort: 'desc', nulls: 'last' } },
     { updatedAt: 'asc' },
   ]);
   assert.equal(calls[0].take, 5);

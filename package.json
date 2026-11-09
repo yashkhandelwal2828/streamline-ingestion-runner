@@ -8,6 +8,8 @@
     "build": "prisma generate && tsc",
     "start:worker": "node dist/worker.js",
     "ingestion:enqueue-daily": "node dist/scripts/ingestionEnqueueDaily.js",
+    "ingestion:plan-catalog": "node dist/scripts/ingestionPlanCatalog.js",
+    "ingestion:catalog-stats": "node dist/scripts/catalogStats.js",
     "ingestion:enqueue-delta": "node dist/scripts/ingestionEnqueueDelta.js",
     "ingestion:cleanup": "node dist/scripts/ingestionCleanup.js",
     "ingestion:enqueue-omdb": "node dist/scripts/ingestionEnqueueOmdb.js",

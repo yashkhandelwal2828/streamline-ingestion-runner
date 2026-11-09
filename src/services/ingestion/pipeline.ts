@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { parseOmdbPlot } from '../movieSynopsis';
 import { getRatings } from '../omdb';
 import { discoverMovies, discoverTV, getDailyExportIds, getMovieDetails, getTVDetails } from '../tmdb';
+import { PLANNER_SOURCES } from './catalogPlanner';
 import {
   buildDeepEnrichJobData,
   buildFetchJobData,
@@ -64,6 +65,18 @@ type PipelineDeps = {
 };
 
 const HIGH_INTENT_PRIORITY = 300;
+const PLANNER_SOURCE_SET = new Set<string>(Object.values(PLANNER_SOURCES));
+
+/**
+ * Availability is stored per country and is the largest table. INGESTION_AVAILABILITY_REGIONS (comma list)
+ * limits new writes to the countries the app serves; unset keeps every country TMDB returns.
+ */
+export const filterAvailabilityRegions = (regions: string[], env: Record<string, string | undefined> = process.env) => {
+  const allowed = String(env.INGESTION_AVAILABILITY_REGIONS ?? '').split(',').map((value) => value.trim().toUpperCase()).filter(Boolean);
+  if (allowed.length === 0) return regions;
+  const allowedSet = new Set(allowed);
+  return regions.filter((region) => allowedSet.has(region.toUpperCase()));
+};
 const DEEP_ENRICH_PRIORITY_THRESHOLD = 200;
 const RETRYABLE_PRISMA_CONNECTION_ERROR_CODES = new Set(['P1001', 'P1017', 'P2024']);
 const RETRYABLE_PRISMA_CONNECTION_ERROR_MESSAGES = [
@@ -1024,12 +1037,21 @@ const processNormalizeJob = async (
     return;
   }
 
+  // Planner lanes only add titles the app can show: no artwork means the card is hidden anyway.
+  if (PLANNER_SOURCE_SET.has(job.source) && !movieRecord.posterPath) {
+    await store.completeJob(job.id, { skipped: 'no_poster', tmdbId: movieRecord.tmdbId });
+    if (shouldDeleteTmdbSnapshotAfterNormalize() && store.deleteSnapshotById) {
+      await store.deleteSnapshotById(String(job.payload.snapshotId));
+    }
+    return;
+  }
+
   if (!job.shadowMode) {
     const savedMovie = await store.upsertMovie(movieRecord);
     const availabilityRecords = buildPlatformAvailabilityRecords({
       movieId: savedMovie.id,
       details: snapshot.payload,
-      requestedRegions: Object.keys(snapshot.payload?.['watch/providers']?.results ?? {}),
+      requestedRegions: filterAvailabilityRegions(Object.keys(snapshot.payload?.['watch/providers']?.results ?? {})),
       capturedAt: deps.now(),
     });
     await store.replacePlatformAvailability(savedMovie.id, availabilityRecords);

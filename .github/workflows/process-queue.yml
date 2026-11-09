@@ -33,12 +33,13 @@ jobs:
       INGESTION_MAX_JOBS_PER_TICK: '5'
       INGESTION_STALE_RECOVERY_MINUTES: '15'
       INGESTION_STALE_RECOVERY_INTERVAL_MS: '60000'
-      INGESTION_MIN_RELEASE_YEAR: '2010'
       INGESTION_LANGUAGE_MODE: weighted
       INGESTION_LANGUAGE_WEIGHTS: 'hi:100,en:20,ta:15,te:15,ml:10'
       INGESTION_FALLBACK_TO_GLOBAL: 'true'
       # Emit a summary line every minute and a final one when the burst stops.
       INGESTION_WORKER_SUMMARY_INTERVAL_MS: '60000'
+      # Countries the app serves (country picker plus common expat markets). Others are not stored for new titles.
+      INGESTION_AVAILABILITY_REGIONS: 'IN,US,GB,CA,AU,DE,FR,JP,KR,BR,MX,ES,IT,NL,SE,TR,ID,PH,TH,ZA,AE,SA,SG,MY,NZ,IE,PK,BD,NP,LK,QA,KW,OM,BH,AT,CH,BE,PT,PL,DK,NO,FI,AR,CO,CL'
       # Stop 2 minutes before the external timeout so the summary file is always written.
       INGESTION_WORKER_BURST_SECONDS: '3180'
       INGESTION_WORKER_SUMMARY_FILE: 'worker-summary.json'

@@ -68,9 +68,10 @@ export const findMoviesNeedingOmdbEnrichment = async (
         { plotFull: null },
       ],
     },
+    // Titles with no rating first (Postgres sorts NULL last by default), newest releases first.
     orderBy: [
-      { imdbRating: 'asc' },
-      { releaseDate: 'desc' },
+      { imdbRating: { sort: 'asc', nulls: 'first' } },
+      { releaseDate: { sort: 'desc', nulls: 'last' } },
       { updatedAt: 'asc' },
     ],
     take: limit,

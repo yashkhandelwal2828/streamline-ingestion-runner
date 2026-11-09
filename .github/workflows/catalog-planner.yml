@@ -1,0 +1,40 @@
+name: Catalog planner (new, repair, backfill)
+
+# Spends the daily TMDB title budget newest-first: new and upcoming releases, then incomplete rows,
+# then every remaining TMDB title by popularity. Process-queue does the fetching.
+on:
+  schedule:
+    - cron: '40 */6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: catalog-planner
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      INGESTION_TMDB_DAILY_TITLE_BUDGET: '4000'
+      INGESTION_PLANNER_RUNS_PER_DAY: '4'
+      INGESTION_PLANNER_NEW_SHARE_PCT: '40'
+      INGESTION_PLANNER_REPAIR_SHARE_PCT: '15'
+      # Neon free tier is 512 MB; stop adding titles with headroom left for user data.
+      INGESTION_DB_SOFT_LIMIT_MB: '450'
+      TMDB_REQUESTS_PER_SECOND: '8'
+      TMDB_MAX_429_BACKOFF_SECONDS: '300'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --include=dev
+      - run: npm run build
+      - name: Plan catalog fetches
+        env:
+          NODE_ENV: production
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: npm run ingestion:plan-catalog

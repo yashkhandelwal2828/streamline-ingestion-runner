@@ -1,8 +1,7 @@
 name: Enqueue daily catalog fill
 
 on:
-  schedule:
-    - cron: '10 */6 * * *'
+  # Replaced by the catalog planner (catalog-planner.yml). Kept for manual runs.
   workflow_dispatch:
 
 concurrency:

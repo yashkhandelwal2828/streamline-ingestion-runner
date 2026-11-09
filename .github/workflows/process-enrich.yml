@@ -12,7 +12,7 @@ concurrency:
 jobs:
   process-enrich:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       RUN_CRON_SCHEDULER: 'false'
       INGESTION_ALLOWED_JOB_TYPES: 'DEEP_ENRICH'
@@ -20,7 +20,7 @@ jobs:
       INGESTION_MAX_JOBS_PER_TICK: '3'
       INGESTION_STALE_RECOVERY_MINUTES: '15'
       INGESTION_STALE_RECOVERY_INTERVAL_MS: '60000'
-      INGESTION_OMDB_DAILY_LIMIT: '200'
+      INGESTION_OMDB_DAILY_LIMIT: '900'
       INGESTION_OMDB_RETRY_RESERVE: '50'
     steps:
       - uses: actions/checkout@v4
@@ -41,4 +41,4 @@ jobs:
           NODE_ENV: production
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
-        run: timeout 600 npm run start:worker || test $? -eq 124
+        run: timeout 1500 npm run start:worker || test $? -eq 124

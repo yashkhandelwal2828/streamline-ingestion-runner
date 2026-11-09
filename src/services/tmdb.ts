@@ -403,3 +403,64 @@ export const getDailyExportIds = async (
 
   throw new Error(`Unable to fetch TMDB daily export for media type: ${mediaType}`);
 };
+
+export type ExportEntry = { id: number; popularity: number };
+
+/**
+ * Every TMDB id in the daily export, most popular first. Adult titles and movie "video" entries
+ * (compilations, recorded events) are left out. The export carries only id, popularity and those flags.
+ */
+export const getDailyExportEntries = async (
+  mediaType: ExportMediaType,
+  now: Date = new Date(),
+): Promise<{ dateKey: string; entries: ExportEntry[] }> => {
+  for (const offset of [1, 2, 0]) {
+    const date = new Date(now);
+    date.setUTCDate(date.getUTCDate() - offset);
+    for (const filename of getExportFileCandidates(mediaType, date)) {
+      try {
+        const response = await axios.get(`${TMDB_EXPORTS_URL}/${filename}`, { responseType: 'stream', timeout: 120_000 });
+        const lines = readline.createInterface({ input: response.data.pipe(zlib.createGunzip()), crlfDelay: Infinity });
+        const entries: ExportEntry[] = [];
+        for await (const raw of lines) {
+          try {
+            const row = JSON.parse(String(raw));
+            const id = Number.parseInt(String(row?.id ?? ''), 10);
+            if (!Number.isInteger(id) || id <= 0 || row.adult === true || row.video === true) continue;
+            entries.push({ id, popularity: Number(row.popularity) || 0 });
+          } catch {
+            // One malformed line must not fail the whole export.
+          }
+        }
+        entries.sort((a, b) => b.popularity - a.popularity || a.id - b.id);
+        return { dateKey: filename, entries };
+      } catch (error: any) {
+        if (error?.response?.status !== 404) {
+          console.warn(`Failed to fetch TMDB daily export ${filename}:`, error?.message ?? error);
+        }
+      }
+    }
+  }
+  throw new Error(`Unable to fetch TMDB daily export for media type: ${mediaType}`);
+};
+
+/** Popular titles released (or premiering) inside a date window, optionally in one original language. */
+export const discoverReleasedBetween = async (
+  mediaType: 'movie' | 'tv',
+  page: number,
+  options: { from: string; to: string; language?: string },
+): Promise<Array<{ id: number; poster_path?: string | null }>> => {
+  const dateField = mediaType === 'movie' ? 'primary_release_date' : 'first_air_date';
+  const params: Record<string, string | number | boolean> = {
+    page,
+    sort_by: 'popularity.desc',
+    include_adult: false,
+    [`${dateField}.gte`]: options.from,
+    [`${dateField}.lte`]: options.to,
+  };
+  if (options.language) params.with_original_language = options.language;
+  return withRetry(
+    () => withTmdbGovernor(() => getTmdbClient().get(`/discover/${mediaType}`, { params })).then((response) => response.data.results ?? []),
+    `discoverReleasedBetween(${mediaType} page ${page})`,
+  );
+};
