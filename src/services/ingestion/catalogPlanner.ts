@@ -116,10 +116,17 @@ export const runCatalogPlanner = async (deps: PlannerDeps, config: PlannerConfig
 
   const usedToday = await prisma.ingestionJob.count({ where: { type: 'FETCH', createdAt: { gte: startOfUtcDay(now) } } });
   const budget = runBudget(config, usedToday, now);
-  const [{ bytes }] = await prisma.$queryRawUnsafe<Array<{ bytes: bigint }>>('SELECT pg_database_size(current_database()) AS bytes');
+  const [{ bytes, max_mb: maxMb }] = await prisma.$queryRawUnsafe<Array<{ bytes: bigint; max_mb?: string | null }>>(
+    "SELECT pg_database_size(current_database()) AS bytes, current_setting('neon.max_cluster_size', true) AS max_mb");
   const dbBytes = Number(bytes);
-  const storageFull = dbBytes >= config.dbSoftLimitBytes;
-  const summary: Record<string, unknown> = { budget, usedToday, dbMegabytes: Math.round(dbBytes / 1048576), storageFull };
+  // Neon reports its own cap; stay 12% under it (or under the configured limit, whichever is lower).
+  const neonLimitBytes = Number(maxMb) > 0 ? Number(maxMb) * 1048576 : null;
+  const softLimit = neonLimitBytes ? Math.min(config.dbSoftLimitBytes, Math.floor(neonLimitBytes * 0.88)) : config.dbSoftLimitBytes;
+  const storageFull = dbBytes >= softLimit;
+  const summary: Record<string, unknown> = {
+    budget, usedToday, dbMegabytes: Math.round(dbBytes / 1048576), softLimitMegabytes: Math.round(softLimit / 1048576),
+    neonLimitMegabytes: neonLimitBytes ? Math.round(neonLimitBytes / 1048576) : null, storageFull,
+  };
   if (budget === 0) {
     summary.skippedReason = 'daily_budget_used';
     log('catalog_planner_summary', summary);
