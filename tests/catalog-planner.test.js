@@ -85,3 +85,12 @@ test('filterAvailabilityRegions keeps only configured countries', () => {
   assert.deepEqual(filterAvailabilityRegions(['IN', 'US', 'PA'], { INGESTION_AVAILABILITY_REGIONS: 'in,us' }), ['IN', 'US']);
   assert.deepEqual(filterAvailabilityRegions(['IN', 'PA'], {}), ['IN', 'PA']);
 });
+
+test('parseSizeSetting reads Neon size settings', () => {
+  const { parseSizeSetting } = require('../dist/services/ingestion/catalogPlanner.js');
+  assert.equal(parseSizeSetting('1GB'), 1024 ** 3);
+  assert.equal(parseSizeSetting('512MB'), 512 * 1024 ** 2);
+  assert.equal(parseSizeSetting('300'), 300 * 1024 ** 2);
+  assert.equal(parseSizeSetting(null), null);
+  assert.equal(parseSizeSetting('unlimited'), null);
+});

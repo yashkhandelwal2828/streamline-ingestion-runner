@@ -96,6 +96,15 @@ export type PlannerDeps = {
   log?: (event: string, data: Record<string, unknown>) => void;
 };
 
+/** Postgres size settings come back as e.g. "1GB", "512MB" or a bare number of MB. */
+export const parseSizeSetting = (value: string | null | undefined): number | null => {
+  const match = /^\s*(\d+(?:\.\d+)?)\s*(kB|MB|GB|TB)?\s*$/i.exec(String(value ?? ''));
+  if (!match) return null;
+  const units: Record<string, number> = { kb: 1024, mb: 1024 ** 2, gb: 1024 ** 3, tb: 1024 ** 4 };
+  const bytes = Number(match[1]) * units[(match[2] ?? 'MB').toLowerCase()];
+  return bytes > 0 ? Math.floor(bytes) : null;
+};
+
 const isoDay = (date: Date) => date.toISOString().slice(0, 10);
 const startOfUtcDay = (now: Date) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
@@ -120,7 +129,7 @@ export const runCatalogPlanner = async (deps: PlannerDeps, config: PlannerConfig
     "SELECT pg_database_size(current_database()) AS bytes, current_setting('neon.max_cluster_size', true) AS max_mb");
   const dbBytes = Number(bytes);
   // Neon reports its own cap; stay 12% under it (or under the configured limit, whichever is lower).
-  const neonLimitBytes = Number(maxMb) > 0 ? Number(maxMb) * 1048576 : null;
+  const neonLimitBytes = parseSizeSetting(maxMb);
   const softLimit = neonLimitBytes ? Math.min(config.dbSoftLimitBytes, Math.floor(neonLimitBytes * 0.88)) : config.dbSoftLimitBytes;
   const storageFull = dbBytes >= softLimit;
   const summary: Record<string, unknown> = {

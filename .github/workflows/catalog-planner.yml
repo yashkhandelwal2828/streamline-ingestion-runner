@@ -20,8 +20,8 @@ jobs:
       INGESTION_PLANNER_RUNS_PER_DAY: '4'
       INGESTION_PLANNER_NEW_SHARE_PCT: '40'
       INGESTION_PLANNER_REPAIR_SHARE_PCT: '15'
-      # Neon free tier is 512 MB; stop adding titles with headroom left for user data.
-      INGESTION_DB_SOFT_LIMIT_MB: '450'
+      # Neon reports a 1 GB cap; the planner also stops at 88% of whatever Neon reports.
+      INGESTION_DB_SOFT_LIMIT_MB: '900'
       TMDB_REQUESTS_PER_SECOND: '8'
       TMDB_MAX_429_BACKOFF_SECONDS: '300'
     steps:
