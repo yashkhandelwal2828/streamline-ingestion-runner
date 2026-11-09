@@ -166,10 +166,13 @@ export const runCatalogPlanner = async (deps: PlannerDeps, config: PlannerConfig
   const repairRows = repairTarget > 0
     ? await prisma.$queryRawUnsafe<Array<{ tmdbId: number; mediaType: string }>>(
       `SELECT "tmdbId", "mediaType" FROM "Movie"
-       WHERE "updatedAt" < NOW() - INTERVAL '7 days'
-         AND (
-           (cardinality(genres) = 0 AND "runtimeMinutes" IS NULL AND "totalSeasons" IS NULL AND cardinality(director) = 0)
-           OR (("posterPath" IS NULL OR "posterPath" = '') AND "releaseDate" > NOW() - INTERVAL '2 years')
+       WHERE (
+           -- Stubs from charts and search: never fetched in full (no cast, crew, runtime or seasons).
+           ("runtimeMinutes" IS NULL AND "totalSeasons" IS NULL AND cardinality(director) = 0 AND cardinality("cast") = 0
+             AND "updatedAt" < NOW() - INTERVAL '1 hour')
+           -- Recent titles still without artwork, retried weekly.
+           OR (("posterPath" IS NULL OR "posterPath" = '') AND "releaseDate" > NOW() - INTERVAL '2 years'
+             AND "updatedAt" < NOW() - INTERVAL '7 days')
          )
        ORDER BY "createdAt" DESC, "releaseDate" DESC NULLS LAST
        LIMIT $1`, repairTarget)
