@@ -862,7 +862,7 @@ export const createPrismaIngestionStore = (prisma: {
         dayEnd,
       };
     },
-    async countQueuedAndRunningJobs() {
+    async countQueuedAndRunningJobs(options: { allowedJobTypes?: readonly string[] } = {}) {
       if (!prisma.ingestionJob.count) {
         throw new Error('countQueuedAndRunningJobs requires Prisma ingestionJob.count support');
       }
@@ -873,8 +873,9 @@ export const createPrismaIngestionStore = (prisma: {
         },
       };
 
-      if (allowedJobTypes.length > 0) {
-        where.type = { in: allowedJobTypes };
+      const types = (options.allowedJobTypes ?? allowedJobTypes).filter(Boolean);
+      if (types.length > 0) {
+        where.type = { in: types };
       }
 
       return prisma.ingestionJob.count({ where });

@@ -35,15 +35,19 @@ export const logRunnerConfig = (scriptName: string) => {
   });
 };
 
-export const getQueueDepth = async (store: ReturnType<typeof createPrismaIngestionStore>) => {
-  return store.countQueuedAndRunningJobs();
+export const getQueueDepth = async (
+  store: ReturnType<typeof createPrismaIngestionStore>,
+  allowedJobTypes?: readonly string[],
+) => {
+  return store.countQueuedAndRunningJobs(allowedJobTypes ? { allowedJobTypes } : {});
 };
 
 export const logQueueDepth = async (
   label: string,
   store: ReturnType<typeof createPrismaIngestionStore>,
+  allowedJobTypes?: readonly string[],
 ) => {
-  const depth = await getQueueDepth(store);
+  const depth = await getQueueDepth(store, allowedJobTypes);
   console.log(`[queue] ${label}: ${depth} queued/running`);
   return depth;
 };
@@ -51,8 +55,9 @@ export const logQueueDepth = async (
 export const skipIfQueueAboveWatermark = async (
   store: ReturnType<typeof createPrismaIngestionStore>,
   scriptName: string,
+  options: { allowedJobTypes?: readonly string[] } = {},
 ) => {
-  const depth = await getQueueDepth(store);
+  const depth = await getQueueDepth(store, options.allowedJobTypes);
   if (isQueueAboveHighWatermark(depth)) {
     console.log(
       `[${scriptName}] queue backlog ${depth} is at/above high watermark ${getIngestionQueueHighWatermark()}; skipping enqueue.`,

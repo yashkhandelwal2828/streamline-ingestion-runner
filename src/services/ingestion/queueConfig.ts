@@ -72,6 +72,17 @@ const INGESTION_JOB_TYPES = [
   'DEEP_ENRICH',
 ] as const;
 
+/**
+ * Job types produced by the discovery/daily enqueue paths. DEEP_ENRICH is excluded on purpose:
+ * OMDb has its own gate and worker, so a deep enrichment backlog must not stop discovery enqueues.
+ */
+export const INGESTION_DISCOVERY_LANE_JOB_TYPES = [
+  'CATALOG_REFRESH',
+  'DISCOVER',
+  'FETCH',
+  'NORMALIZE',
+] as const;
+
 export const parseIngestionAllowedJobTypes = (
   env: Record<string, string | undefined> = process.env,
 ) => {
